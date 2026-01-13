@@ -3,8 +3,9 @@ package pipeline_test
 import (
 	"context"
 	"fmt"
-	"hallenweaver/go-flow/pipeline"
 	"time"
+
+	"github.com/HallenWeaver/go-flow/pipeline"
 )
 
 // ExampleNew demonstrates creating a basic pipeline with 3 workers.

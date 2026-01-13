@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"hallenweaver/go-flow/pipeline"
 	"log"
 	"time"
+
+	"github.com/HallenWeaver/go-flow/pipeline"
 )
 
 func main() {

@@ -5,13 +5,13 @@ This file shows what users will see when viewing godoc for the pipeline package.
 ## Installation
 
 ```bash
-go get hallenweaver/go-flow
+go get github.com/HallenWeaver/go-flow
 ```
 
 ## Quick Start
 
 ```go
-import "hallenweaver/go-flow/pipeline"
+import "github.com/HallenWeaver/go-flow/pipeline"
 
 // Create a pipeline with 4 workers
 p := pipeline.New(4, func(ctx context.Context, x int) (int, error) {
