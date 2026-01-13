@@ -1,0 +1,7 @@
+{
+  "go.goroot": "",
+  "go.gopath": "",
+  "go.alternateTools": {
+    "go": "/opt/homebrew/bin/go"
+  }
+}
