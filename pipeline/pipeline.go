@@ -3,11 +3,13 @@ package pipeline
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type Job[T any] struct {
 	ID      string
 	Payload T
+	Timeout time.Duration
 }
 
 type Result[R any] struct {
@@ -65,7 +67,15 @@ func (p *Pipeline[T, R]) worker(ctx context.Context, jobs <-chan Job[T], results
 				return
 			}
 
-			val, err := p.handler(ctx, job.Payload)
+			jobCtx := ctx
+			cancel := func() {}
+			if job.Timeout > 0 {
+				jobCtx, cancel = context.WithTimeout(ctx, job.Timeout)
+			}
+
+			val, err := p.handler(jobCtx, job.Payload)
+			cancel()
+
 			select {
 			case <-ctx.Done():
 				return

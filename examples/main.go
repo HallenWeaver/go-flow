@@ -15,8 +15,12 @@ func main() {
 	jobs := make(chan pipeline.Job[int])
 
 	p := pipeline.New(4, func(ctx context.Context, x int) (int, error) {
-		time.Sleep(80 * time.Millisecond)
-		return x * x, nil
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(80 * time.Millisecond):
+			return x * x, nil
+		}
 	})
 
 	results := p.Run(ctx, jobs)
@@ -24,10 +28,15 @@ func main() {
 	go func() {
 		defer close(jobs)
 		for i := range 20 {
+			timeout := 0 * time.Millisecond
+			if i%5 == 0 {
+				timeout = 50 * time.Millisecond
+			}
+
 			select {
 			case <-ctx.Done():
 				return
-			case jobs <- pipeline.Job[int]{ID: fmt.Sprintf("job-%02d", i), Payload: i}:
+			case jobs <- pipeline.Job[int]{ID: fmt.Sprintf("job-%02d", i), Payload: i, Timeout: timeout}:
 			}
 		}
 	}()

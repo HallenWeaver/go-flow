@@ -91,6 +91,49 @@ func TestCancellationStopsPipeline(t *testing.T) {
 	}
 }
 
+func TestPerJobTimeout(t *testing.T) {
+	ctx := context.Background()
+
+	jobs := make(chan Job[int])
+
+	p := New(1, func(ctx context.Context, x int) (int, error) {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+			return x, nil
+		}
+	})
+
+	results := p.Run(ctx, jobs)
+
+	go func() {
+		defer close(jobs)
+		jobs <- Job[int]{ID: "fast-timeout", Payload: 1, Timeout: 20 * time.Millisecond}
+		jobs <- Job[int]{ID: "no-timeout", Payload: 2, Timeout: 0}
+	}()
+
+	var gotTimeout, gotSuccess bool
+	for res := range results {
+		switch res.JobID {
+		case "fast-timeout":
+			if res.Error == nil {
+				t.Fatalf("expected timeout error for job 'fast-timeout'")
+			}
+			gotTimeout = true
+		case "no-timeout":
+			if res.Error != nil {
+				t.Fatalf("unexpected error for job 'no-timeout': %v", res.Error)
+			}
+			gotSuccess = true
+		}
+	}
+
+	if !gotTimeout || !gotSuccess {
+		t.Fatalf("expected both results; gotTimeout=%v gotSuccess=%v", gotTimeout, gotSuccess)
+	}
+}
+
 func setupTestContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
 }
