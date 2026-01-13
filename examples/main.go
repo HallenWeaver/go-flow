@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"hallenweaver/goflow/pipeline"
+	"hallenweaver/go-flow/pipeline"
 	"log"
 	"time"
 )
@@ -23,7 +23,7 @@ func main() {
 
 	go func() {
 		defer close(jobs)
-		for i := 0; i < 20; i++ {
+		for i := range 20 {
 			select {
 			case <-ctx.Done():
 				return
@@ -37,6 +37,6 @@ func main() {
 			log.Printf("job: %s | err: %s", r.JobID, r.Error)
 			continue
 		}
-		log.Printf("job: %s | value: %s", r.JobID, r.Value)
+		log.Printf("job: %s | value: %d", r.JobID, r.Value)
 	}
 }
