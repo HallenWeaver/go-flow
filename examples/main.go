@@ -14,16 +14,23 @@ func main() {
 
 	jobs := make(chan pipeline.Job[int])
 
-	p := pipeline.New(4, func(ctx context.Context, x int) (int, error) {
+	handlerFunc := func(ctx context.Context, x int) (int, error) {
 		select {
 		case <-ctx.Done():
 			return 0, ctx.Err()
-		case <-time.After(80 * time.Millisecond):
+		case <-time.After(100 * time.Millisecond):
 			return x * x, nil
 		}
-	})
+	}
 
-	results := p.Run(ctx, jobs)
+	options := pipeline.Options{
+		JobBuffer:    8,
+		ResultBuffer: 8,
+	}
+
+	p := pipeline.New(4, handlerFunc, options)
+
+	in, out := p.Start(ctx)
 
 	go func() {
 		defer close(jobs)
@@ -41,11 +48,33 @@ func main() {
 		}
 	}()
 
-	for r := range results {
+	go func() {
+		defer close(in)
+		for i := range 20 {
+			timeout := time.Duration(0)
+			if i%5 == 0 {
+				timeout = 50 * time.Millisecond
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case in <- pipeline.Job[int]{
+				ID:      fmt.Sprintf("job-%02d", i),
+				Payload: i,
+				Timeout: timeout,
+			}:
+			}
+		}
+	}()
+
+	// Consumer
+	for r := range out {
 		if r.Error != nil {
-			log.Printf("job: %s | err: %s", r.JobID, r.Error)
+			log.Printf("job=%s err=%v", r.JobID, r.Error)
 			continue
 		}
-		log.Printf("job: %s | value: %d", r.JobID, r.Value)
+		log.Printf("job=%s value=%d", r.JobID, r.Value)
 	}
+
+	log.Printf("stats=%+v", p.Stats())
 }

@@ -134,6 +134,45 @@ func TestPerJobTimeout(t *testing.T) {
 	}
 }
 
+func TestStatsBasicAccounting(t *testing.T) {
+	ctx := context.Background()
+
+	testHandler := func(ctx context.Context, x int) (int, error) {
+		if x%2 == 0 {
+			return 0, context.Canceled
+		}
+		return x, nil
+	}
+
+	p := New(2, testHandler, Options{ResultBuffer: 10})
+
+	jobs := make(chan Job[int])
+	results := p.Run(ctx, jobs)
+
+	go func() {
+		defer close(jobs)
+		for i := range 20 {
+			jobs <- Job[int]{ID: "id", Payload: i}
+		}
+	}()
+
+	seen := 0
+	for range results {
+		seen++
+	}
+
+	st := p.Stats()
+	if st.ResultsEmitted != uint64(seen) {
+		t.Fatalf("expected ResultsEmitted=%d, got %d", seen, st.ResultsEmitted)
+	}
+	if st.JobsReceived != 20 {
+		t.Fatalf("expected JobsReceived=20, got %d", st.JobsReceived)
+	}
+	if st.JobsCompleted+st.JobsFailed+st.JobsCancelled != st.JobsReceived {
+		t.Fatalf("expected succeeded+failed+canceled == received; got %+v", st)
+	}
+}
+
 func setupTestContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(context.Background())
 }
