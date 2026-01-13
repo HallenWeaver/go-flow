@@ -1,3 +1,4 @@
+// Package pipeline provides a concurrent worker pool for processing jobs with generics support.
 package pipeline
 
 import (
@@ -8,23 +9,38 @@ import (
 	"time"
 )
 
+// Job represents a unit of work to be processed by the pipeline.
+// ID uniquely identifies the job, Payload contains the input data,
+// and Timeout optionally specifies a per-job timeout duration.
 type Job[T any] struct {
 	ID      string
 	Payload T
 	Timeout time.Duration
 }
 
+// Result contains the outcome of processing a job.
+// JobID matches the original Job.ID, Value holds the result,
+// and Error contains any error that occurred during processing.
 type Result[R any] struct {
 	JobID string
 	Value R
 	Error error
 }
 
+// Options configures pipeline behavior.
+// JobBuffer sets the input channel buffer size.
+// ResultBuffer sets the output channel buffer size.
 type Options struct {
 	JobBuffer    int
 	ResultBuffer int
 }
 
+// Stats provides runtime statistics about pipeline operation.
+// JobsReceived counts total jobs received by workers.
+// JobsCompleted counts successfully completed jobs.
+// JobsFailed counts jobs that returned non-context errors.
+// JobsCancelled counts jobs that were cancelled or timed out.
+// ResultsEmitted counts total results sent to output channel.
 type Stats struct {
 	JobsReceived   uint64
 	JobsCompleted  uint64
@@ -41,6 +57,8 @@ type counters struct {
 	resultsEmitted atomic.Uint64
 }
 
+// Pipeline manages a pool of workers that process jobs concurrently.
+// It is parameterized by input type T and output type R.
 type Pipeline[T any, R any] struct {
 	workers int
 	handler func(context.Context, T) (R, error)
@@ -48,6 +66,11 @@ type Pipeline[T any, R any] struct {
 	c       counters
 }
 
+// New creates a new Pipeline with the specified number of workers and handler function.
+// workers specifies the number of concurrent workers (minimum 1).
+// handler is called for each job with the job's payload.
+// opts optionally configures buffer sizes for input and output channels.
+// Panics if handler is nil.
 func New[T any, R any](workers int, handler func(context.Context, T) (R, error), opts ...Options) *Pipeline[T, R] {
 	if workers <= 0 {
 		workers = 1
@@ -74,14 +97,29 @@ func New[T any, R any](workers int, handler func(context.Context, T) (R, error),
 	}
 }
 
+// Start creates input and output channels and begins processing.
+// Returns the input channel for sending jobs and output channel for receiving results.
+// The input channel should be closed by the caller when no more jobs will be sent.
+// The output channel will be closed automatically when all workers finish.
+// Panics if ctx is nil.
 func (p *Pipeline[T, R]) Start(ctx context.Context) (chan<- Job[T], <-chan Result[R]) {
+	if ctx == nil {
+		panic("pipeline: context cannot be nil")
+	}
 	jobs := make(chan Job[T], p.opts.JobBuffer)
 	results := make(chan Result[R], p.opts.ResultBuffer)
-	p.run(ctx, jobs, results)
+	go p.run(ctx, jobs, results)
 	return jobs, results
 }
 
+// Run starts processing jobs from the provided input channel.
+// Returns an output channel for receiving results.
+// The output channel will be closed when all workers finish.
+// Panics if ctx is nil.
 func (p *Pipeline[T, R]) Run(ctx context.Context, jobs <-chan Job[T]) <-chan Result[R] {
+	if ctx == nil {
+		panic("pipeline: context cannot be nil")
+	}
 	results := make(chan Result[R], p.opts.ResultBuffer)
 	go p.run(ctx, jobs, results)
 	return results
@@ -144,6 +182,8 @@ func (p *Pipeline[T, R]) worker(ctx context.Context, jobs <-chan Job[T], results
 	}
 }
 
+// Stats returns a snapshot of the pipeline's runtime statistics.
+// Safe to call concurrently from multiple goroutines.
 func (p *Pipeline[T, R]) Stats() Stats {
 	return Stats{
 		JobsReceived:   p.c.jobsReceived.Load(),
