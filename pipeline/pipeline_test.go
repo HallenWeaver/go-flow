@@ -212,6 +212,8 @@ func TestNilContext(t *testing.T) {
 
 	p := New(1, handler)
 
+	var nilCtx context.Context
+
 	t.Run("Run_panics", func(t *testing.T) {
 		defer func() {
 			if r := recover(); r == nil {
@@ -220,7 +222,7 @@ func TestNilContext(t *testing.T) {
 		}()
 
 		jobs := make(chan Job[int])
-		p.Run(nil, jobs)
+		p.Run(nilCtx, jobs)
 	})
 
 	t.Run("Start_panics", func(t *testing.T) {
@@ -230,7 +232,7 @@ func TestNilContext(t *testing.T) {
 			}
 		}()
 
-		p.Start(nil)
+		p.Start(nilCtx)
 	})
 }
 
@@ -380,7 +382,7 @@ func TestMultipleRuns(t *testing.T) {
 
 	p := New(2, handler)
 
-	for run := 0; run < 3; run++ {
+	for run := range 3 {
 		run := run // Capture loop variable
 		ctx := context.Background()
 		jobs := make(chan Job[int])
@@ -388,7 +390,7 @@ func TestMultipleRuns(t *testing.T) {
 
 		go func() {
 			defer close(jobs)
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				jobs <- Job[int]{ID: fmt.Sprintf("run%d-job%d", run, i), Payload: i}
 			}
 		}()

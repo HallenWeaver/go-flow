@@ -206,7 +206,7 @@ func ExamplePipeline_cancellation() {
 
 	go func() {
 		defer close(jobs)
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			select {
 			case <-ctx.Done():
 				return
@@ -220,10 +220,12 @@ func ExamplePipeline_cancellation() {
 	for range results {
 		count++
 		if count == 3 {
-			cancel()
 			break
 		}
 	}
+
+	// Cancel the context
+	cancel()
 
 	// Drain remaining results after cancellation
 	for range results {
